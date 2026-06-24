@@ -44,6 +44,15 @@ PERSIAN_MONTHS = {
 
 EN_TO_FA = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
 PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹"
+
+def _assign_year_month(df, parser, period_col="period_end", y_col="سال", m_col="ماه_num"):
+    """انتساب امنِ ستون‌های سال/ماه از روی period_end.
+    مقاوم در برابر دیتافریم خالی و تفاوت نسخه‌های پانداس
+    (جایگزین الگوی شکنندهٔ df[[a,b]] = s.apply(lambda: pd.Series(...)))."""
+    _pe = df[period_col].map(parser)
+    df[y_col] = _pe.map(lambda t: t[0] if isinstance(t, tuple) else None)
+    df[m_col] = _pe.map(lambda t: t[1] if isinstance(t, tuple) else None)
+    return df
 ARABIC_DIGITS  = "٠١٢٣٤٥٦٧٨٩"
 
 
@@ -1922,9 +1931,7 @@ if page == "📈 روند یک نماد":
         except Exception:
             return None, None
 
-    sub_all[["سال", "ماه_num"]] = sub_all["period_end"].apply(
-        lambda p: pd.Series(extract_year_month(p))
-    )
+    _assign_year_month(sub_all, extract_year_month)
     sub_all["ماه_label"] = sub_all["ماه_num"].apply(
         lambda m: PERSIAN_MONTHS.get(f"{int(m):02d}", str(m)) if pd.notna(m) else ""
     )
@@ -2690,7 +2697,7 @@ elif page == "🔬 محصولات":
         def _eym_amt(p):
             try: y,m,_=p.split("/"); return int(y),int(m)
             except: return None,None
-        sub_amt[["سال","ماه_num"]] = sub_amt["period_end"].apply(lambda p: pd.Series(_eym_amt(p)))
+        _assign_year_month(sub_amt, _eym_amt)
         sub_amt["ماه_label"] = sub_amt["ماه_num"].apply(
             lambda m: PERSIAN_MONTHS.get(f"{int(m):02d}", str(m)) if pd.notna(m) else "")
 
@@ -2744,7 +2751,7 @@ elif page == "🔬 محصولات":
         def _eym(p):
             try: y,m,_ = p.split("/"); return int(y),int(m)
             except: return None,None
-        vol_sub[["سال","ماه_num"]] = vol_sub["period_end"].apply(lambda p: pd.Series(_eym(p)))
+        _assign_year_month(vol_sub, _eym)
         vol_sub["ماه_label"] = vol_sub["ماه_num"].apply(
             lambda m: PERSIAN_MONTHS.get(f"{int(m):02d}", str(m)) if pd.notna(m) else "")
         unit_str = sub_all_cats.iloc[0]["unit"] if not sub_all_cats.empty else ""
@@ -2807,7 +2814,7 @@ elif page == "🔬 محصولات":
         def _eym2(p):
             try: y,m,_=p.split("/"); return int(y),int(m)
             except: return None,None
-        vol_sub2[["سال","ماه_num"]] = vol_sub2["period_end"].apply(lambda p: pd.Series(_eym2(p)))
+        _assign_year_month(vol_sub2, _eym2)
         vol_sub2["ماه_label"] = vol_sub2["ماه_num"].apply(
             lambda m: PERSIAN_MONTHS.get(f"{int(m):02d}", str(m)) if pd.notna(m) else "")
         fig_both = go.Figure()
@@ -3047,7 +3054,7 @@ elif page == "🔬 محصولات":
             def _eym_pv(p):
                 try: y, m, _ = p.split("/"); return int(y), int(m)
                 except: return None, None
-            _pv_df[["سال", "ماه_num"]] = _pv_df["period_end"].apply(lambda p: pd.Series(_eym_pv(p)))
+            _assign_year_month(_pv_df, _eym_pv)
             _pv_df["ماه_label"] = _pv_df["ماه_num"].apply(
                 lambda m: PERSIAN_MONTHS.get(f"{int(m):02d}", str(m)) if pd.notna(m) else "")
 
