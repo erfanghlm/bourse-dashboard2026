@@ -1909,20 +1909,20 @@ if page == "📈 روند یک نماد":
     # اگر یک period چند ردیف داشت (مثلاً هر دوی «جمع» و «جمع درآمدهای عملیاتی»)،
     # ترجیح به «جمع درآمدهای عملیاتی» است؛ اگر نبود، «جمع» را برمی‌گیریم.
     if not sub_all.empty and "report_type" in sub_all.columns:
-        # جدول نرمال‌سازی‌شدهٔ report_type برای هر دوره
-        def _pick_total_row(grp):
-            """از گروهِ یک دوره، ردیفِ «جمع درآمدهای عملیاتی» یا «جمع» را انتخاب کن."""
-            grp = grp.copy()
-            grp["_report_norm"] = grp["report_type"].fillna("").str.strip().str.lower()
-            # اولویت: «جمع درآمدهای عملیاتی» > «جمع»
-            if any(grp["_report_norm"].str.contains(r"درآمدهای.*عملیاتی|عملیاتی.*درآمدهای", regex=True, na=False)):
-                return grp[grp["_report_norm"].str.contains(r"درآمدهای.*عملیاتی|عملیاتی.*درآمدهای", regex=True, na=False)].iloc[-1:]
-            elif any(grp["_report_norm"].str.contains(r"جمع", na=False)):
-                return grp[grp["_report_norm"].str.contains(r"جمع", na=False)].iloc[-1:]
-            return grp.iloc[-1:]  # اگر هیچ‌کدام نیافت، آخری رو برگیر
-
-        sub_all = sub_all.groupby("period_end", group_keys=False).apply(_pick_total_row)
-        sub_all = sub_all.drop(columns=["_report_norm"], errors="ignore")
+        # برای هر دوره یک ردیف نگه‌دار: اولویت «درآمدهای عملیاتی» > «جمع» > آخرین ردیف.
+        # روشِ بُرداری بدونِ groupby.apply تا ستونِ گروه‌بندی (period_end) حفظ شود
+        # (پانداس ۳ ستونِ گروه‌بندی را داخلِ apply حذف می‌کند و باعث KeyError می‌شد).
+        _norm = sub_all["report_type"].fillna("").str.strip().str.lower()
+        _prio = pd.Series(0, index=sub_all.index)
+        _prio[_norm.str.contains(r"جمع", na=False)] = 1
+        _prio[_norm.str.contains(r"درآمدهای.*عملیاتی|عملیاتی.*درآمدهای", regex=True, na=False)] = 2
+        sub_all = sub_all.assign(_prio=_prio, _ord=range(len(sub_all)))
+        sub_all = (sub_all.sort_values(["period_end", "_prio", "_ord"])
+                          .groupby("period_end", as_index=False, group_keys=False)
+                          .tail(1)
+                          .drop(columns=["_prio", "_ord"], errors="ignore")
+                          .sort_values("period_end")
+                          .reset_index(drop=True))
 
     def extract_year_month(period):
         try:
